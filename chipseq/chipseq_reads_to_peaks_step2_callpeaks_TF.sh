@@ -61,6 +61,6 @@ PEAK_FILE_PROPER=${PEAK_FILE}.clean.bed
 BLACKLIST=/data/rivera/genomes/wgEncodeDacMapabilityConsensusExcludable.bed
 
 # Get valid chromosomes and subtract blacklisted regions
-awk 'NR==FNR{a[$0];next}($1 in a)' $HOME/commonscripts/chipseq/human_chrs.nochr.txt ${OUTPUT_DIR}/${SAMPLE_NAME}_peaks.narrowPeak | bedtools subtract -a stdin -b ${BLACKLIST} -A > ${OUTPUT_DIR}/${SAMPLE_NAME}_peaks.narrowPeak.clean.bed
+awk 'NR==FNR{a[$0];next}($1 in a)' $HOME/commonscripts/chipseq/human_chrs.nochr.txt ${PEAK_FILE} | bedtools subtract -a stdin -b ${BLACKLIST} -A > ${PEAK_FILE_PROPER}
 
 echo "DONE cleaning up peaks"
