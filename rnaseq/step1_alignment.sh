@@ -58,9 +58,9 @@ elif [[ ${GENOME} == "hg19" ]]; then
 		/data/aryee/pub/genomes/fetchChromSizes hg19 > /data/rivera/sowmya/genomes/hg19.chrom.sizes
 	fi
 elif [[ ${GENOME} == "Zv9" ]]; then
-	GENOME_FASTA=/pub/genome_references/Zv9/Danio_rerio.Zv9.69.dna.toplevel.fa
-	STAR_INDEX_DIR=/data/langenau/STAR_index_Zv9
-        ANNOTATION_GTF=/pub/genome_references/Zv9/Danio_rerio.Zv9.69.gtf 
+	GENOME_FASTA=/data/langenau/Danio_rerio.Zv9.77.dna.toplevel.fa #/pub/genome_references/Zv9/Danio_rerio.Zv9.69.dna.toplevel.fa
+	STAR_INDEX_DIR=/data/langenau/STAR_index_Zv9.77 #/data/langenau/STAR_index_Zv9
+        ANNOTATION_GTF=/data/langenau/Danio_rerio.Zv9.77.gtf #/pub/genome_references/Zv9/Danio_rerio.Zv9.69.gtf 
 	if [[ ! -f  /data/rivera/sowmya/genomes/Zv9.chrom.sizes ]]; then
 		/data/aryee/pub/genomes/fetchChromSizes danRer7 | sed 's/^chr//g' > /data/rivera/sowmya/genomes/Zv9.chrom.sizes
 	fi
@@ -94,7 +94,7 @@ do
         	R2_FASTQ=`\ls ${FASTQ_PREFIX}*_L00*_R2_001.fastq.gz`
 		readLength=`zcat ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz | head -2 | tail -1 | awk '{ print length($0)}'` # only checks read length of first read. Maybe a problem if reads have been trimmed or have variable lengths for other reasons
 		echo """
-			module load fastqc
+			module load fastqc/0.11.2
 			mkdir -p ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R1
 			mkdir -p ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R2
 			zcat ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz | fastqc --noextract -o ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R1 stdin
@@ -122,6 +122,11 @@ do
 	echo fastq_1 is ${R1_FASTQ}
 	echo fastq_2 is ${R2_FASTQ}
 
+	if [[ ${STRANDED} == "NO" ]] then
+		added_star_option=" --outSAMstrandField intronMotif"
+	else
+		added_star_option=""	
+	fi
 
 	sjdbOverhang=$((readLength -1))
         star_fastq_R1=`echo $R1_FASTQ | sed 's/ /,/g'`
@@ -138,7 +143,7 @@ do
 
 	star_fastq_R1=`echo $R1_FASTQ | sed 's/ /,/g'`
 	star_fastq_R2=`echo $R2_FASTQ | sed 's/ /,/g'`	
-	STAR --genomeDir $STAR_INDEX_DIR --genomeFastaFiles $GENOME_FASTA --sjdbGTFfile $ANNOTATION_GTF --sjdbOverhang ${sjdbOverhang} --runThreadN 1 --outSAMtype BAM Unsorted --outFileNamePrefix  ${OUTPUT_DIR}/STAR_out/$SAMPLE_NAME --readFilesCommand zcat --readFilesIn $star_fastq_R1 $star_fastq_R2
+	STAR ${added_star_option} --genomeDir $STAR_INDEX_DIR --genomeFastaFiles $GENOME_FASTA --sjdbGTFfile $ANNOTATION_GTF --sjdbOverhang ${sjdbOverhang} --runThreadN 1 --outSAMtype BAM Unsorted --outFileNamePrefix  ${OUTPUT_DIR}/STAR_out/$SAMPLE_NAME --readFilesCommand zcat --readFilesIn $star_fastq_R1 $star_fastq_R2
 	
 	# Sorting in separate step because STAR sometimes crashes while sorting by coordinate
 	
@@ -173,7 +178,7 @@ do
 	rm ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.sorted.deduped.bg
 
 	# Get FPKMs for isoforms
-	cufflinks --library-type ${CUFFLINKS_STRANDEDNESS} -o ${OUTPUT_DIR}/cufflinks_out/${SAMPLE_NAME} -G ${ANNOTATION_GTF} ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed.bam
+	cufflinks --quiet --library-type ${CUFFLINKS_STRANDEDNESS} -o ${OUTPUT_DIR}/cufflinks_out/${SAMPLE_NAME} -G ${ANNOTATION_GTF} ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed.bam
 	
 	"""  > ../bsubFiles/star_alignment_${GENOME}_${SAMPLE_NAME}.bsub
 done < ${FILE_SAMPLE_LIST}
