@@ -1,10 +1,11 @@
 if [[ $# -lt 4 ]]; then
-    echo "Usage: `basename $0` -s=sampleName -t=<treatment bam file> -c=<control bam file> -q=<q-value threshold, 0.01 default> -o=<outputDir> --broad(optional) ... ">&2
+    echo "Usage: `basename $0` -s=sampleName -t=<treatment bam file> -c=<control bam file> -q=<q-value threshold, 0.01 default> -o=<outputDir> -d=(merge peaks within d; optional) --broad(optional) ... ">&2
     exit 1
 fi
 
 QTHRESH=0.01
 BROAD_PEAKS="NO"
+MERGE_PEAKS="NO"
 
 for i in "$@"
 do
@@ -33,8 +34,13 @@ case $i in
     BROAD_PEAKS="YES"
     shift # past argument with no value
     ;;
+    -d=*|--mergeDistance=*)
+    MERGE_PEAKS="YES"
+    MERGE_DISTANCE="${i#*=}"
+    shift # past argument with no value
+    ;;
    -h)
-    echo "Usage: `basename $0` -s=sampleName -t=<treatment bam file> -c=<control bam file> -q=<q-value threshold> -o=<outputDir> --broad(optional) ... ">&2
+    echo "Usage: `basename $0` -s=sampleName -t=<treatment bam file> -c=<control bam file> -q=<q-value threshold, 0.01 default> -o=<outputDir> -d=(merge peaks within d; optional) --broad(optional) ... ">&2
     exit 1
     shift
     ;;
@@ -47,13 +53,16 @@ done
 module load python/2.7.3
 module load macs2/2.1
 
-if [[ $BROAD_PEAKS == "YES" ]]; then
-	macs_command="macs2 callpeak --nomodel -g hs -q ${QTHRESH} -t ${TREATMENT_FILE} -c ${CONTROL_FILE} -n ${SAMPLE_NAME} --outdir ${OUTPUT_DIR} --broad"
-	PEAK_FILE=${OUTPUT_DIR}/${SAMPLE_NAME}_peaks.narrowPeak
+cd ${OUTPUT_DIR}
+
+if [[ ${BROAD_PEAKS} == "YES" ]]; then
+	macs_command="macs2 callpeak --nomodel -g hs -q ${QTHRESH} -t ${TREATMENT_FILE} -c ${CONTROL_FILE} -n ${SAMPLE_NAME} --broad --outdir ${OUTPUT_DIR} "
+	PEAK_FILE=${OUTPUT_DIR}/${SAMPLE_NAME}_peaks.broadPeak
 else
 	macs_command="macs2 callpeak -g hs -q ${QTHRESH} -t ${TREATMENT_FILE} -c ${CONTROL_FILE} -n ${SAMPLE_NAME} --outdir ${OUTPUT_DIR}"
-	PEAK_FILE=${OUTPUT_DIR}/${SAMPLE_NAME}_peaks.broadPeak
+	PEAK_FILE=${OUTPUT_DIR}/${SAMPLE_NAME}_peaks.narrowPeak
 fi
+
 echo $macs_command
 
 ${macs_command} 
@@ -62,5 +71,10 @@ BLACKLIST=/data/rivera/genomes/wgEncodeDacMapabilityConsensusExcludable.bed
 
 # Get valid chromosomes and subtract blacklisted regions
 awk 'NR==FNR{a[$0];next}($1 in a)' $HOME/commonscripts/chipseq/human_chrs.nochr.txt ${PEAK_FILE} | bedtools subtract -a stdin -b ${BLACKLIST} -A > ${PEAK_FILE_PROPER}
-
 echo "DONE cleaning up peaks"
+
+if [[ ${MERGE_PEAKS} == "YES" ]]; then
+	sort -k1,1 -k2,2n ${PEAK_FILE_PROPER} | bedtools merge -i stdin -d ${MERGE_DISTANCE} -nms > ${PEAK_FILE}.clean.merged.${MERGE_DISTANCE}.bed
+	echo "DONE merging peaks"
+fi
+
