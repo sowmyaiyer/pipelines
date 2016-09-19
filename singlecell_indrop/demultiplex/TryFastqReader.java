@@ -55,7 +55,6 @@ public class TryFastqReader {
 			
 		}
 		freader.close();
-		System.out.println("here");
 	
 		Iterator<String> bc_iterator = barcodes_and_fastqs.keySet().iterator();
 		while (bc_iterator.hasNext())
@@ -73,7 +72,7 @@ public class TryFastqReader {
 			}
 			while (umiiterator.hasNext())
                         {
-                                uw.write(umiiterator.next());
+                                uw.write(umiiterator.next() + "\n");
                         }
 			fw.close();
 			uw.close();

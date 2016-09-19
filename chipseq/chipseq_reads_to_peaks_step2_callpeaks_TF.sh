@@ -51,6 +51,7 @@ done
 
 
 module load python/2.7.3
+module load  numpy-1.7
 module load macs2/2.1
 
 cd ${OUTPUT_DIR}
