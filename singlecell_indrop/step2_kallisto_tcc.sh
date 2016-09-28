@@ -9,6 +9,6 @@ do
 	FNAME=`basename ${INPUT_FASTQ_GZ} | sed 's/\.fastq\.gz//g'`
 	echo """
 	kallisto pseudo -i /data/langenau/Danio_rerio.GRCz10.cdna_and_ncrna.fa.kallisto_index -o /data/langenau/singlecell_prkdc/out_singlecell/out_kallisto_tcc/${FNAME} --umi -b /data/langenau/singlecell_prkdc/demultiplexed/${FNAME}/barcodes.batch -t 4
-	umis kallisto_table /data/langenau/singlecell_prkdc/out_singlecell/out_kallisto_tcc/${FNAME} /data/langenau/Danio_rerio.GRCz10.cdna.all.fa
+	umis kallisto_table /data/langenau/singlecell_prkdc/out_singlecell/out_kallisto_tcc/${FNAME} /data/langenau/Danio_rerio.GRCz10.cdna_and_ncrna.fa
 	""" > ../bsubFiles/tcc_kallisto_${FNAME}.bsub
 done 

@@ -27,7 +27,7 @@ if [ -f Zebrafish-all.sampleFile ]; then
 	rm Zebrafish-all.sampleFile
 fi
 cat *sampleFile > Zebrafish-all.sampleFile
-./buildGeneNameTable.sh 
+./prep_kallisto.sh 
 
 # For kallisto + umi counting
 ./step2_kallisto.sh
