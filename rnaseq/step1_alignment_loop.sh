@@ -1,9 +1,17 @@
 if [[ $# -lt 4 ]]; then
-    echo "Usage: `basename $0` -g=genome -s=sampleName -q=FastqPrefix -o=outputDir -r=(if stranded library, forward or reverse; if unstranded, do not provide) --run_fastqc(optional) ... ">&2
+    echo "Usage: `basename $0` 
+	-g=genome 
+	-s=sampleName 
+	-q=FastqPrefix 
+	-o=outputDir 
+	-r=library strandedness(optional; forward or reverse; defaults to unstranded)
+	-n=scale for bw(optional; multiple of 1 million; defaults to 1) 
+	--run_fastqc(optional) ... ">&2
     exit 1
 fi
 
 FASTQC="NO"
+SCALING_FACTOR_MULT=1
 
 for i in "$@"
 do
@@ -24,6 +32,10 @@ case $i in
     OUTPUT_DIR="${i#*=}"  
     shift 
     ;;
+    -n=*|--scaling_factor=*)
+    SCALING_FACTOR_MULT="${i#*=}"  
+    shift 
+    ;;
     -r=*|--strandedness=*)
     STRANDEDNESS="${i#*=}"  
     shift 
@@ -33,7 +45,14 @@ case $i in
     shift # past argument with no value
     ;;
    -h)
-    echo "Usage: `basename $0` -g=genome -s=sampleName -q=FastqPrefix -o=outputDir -r=(if stranded library, forward or reverse; if unstranded, do not provide) --run_fastqc(optional) ... ">&2
+	echo "Usage: `basename $0`
+        -g=genome
+        -s=sampleName
+        -q=FastqPrefix
+        -o=outputDir
+        -r=library strandedness(optional; forward or reverse; defaults to unstranded)
+        -n=scale for bw(optional; multiple of 1 million; defaults to 1)
+        --run_fastqc(optional) ... ">&2
     exit 1
     shift 
     ;;
@@ -103,6 +122,7 @@ sjdbOverhang=$((readLength -1))
 star_fastq_R1=`echo $R1_FASTQ | sed 's/ /,/g'`
 star_fastq_R2=`echo $R2_FASTQ | sed 's/ /,/g'`
 
+module use /apps/modulefiles/lab
 module load aryee/star-2.4.0h
 module load samtools/1.1
 module load BEDTools_2.17
@@ -161,7 +181,8 @@ echo "DONE mapping metrics"
 
 # Generate depth-normalized bigwig file
 echo "start bw file generation"
-scalingFactor=`echo ${reads_after_rRNA_removal} | awk -vmappedReads=${reads_after_rRNA_removal} 'BEGIN{print 1000000/mappedReads}'`
+scalingFactor=`echo ${reads_after_rRNA_removal} | awk -vmappedReads=${reads_after_rRNA_removal} -vSCALING_FACTOR=${SCALING_FACTOR_MULT} 'BEGIN{print 1000000*SCALING_FACTOR/mappedReads}'`
+echo $scalingFactor
 bedtools genomecov -ibam ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed.bam -g  /data/rivera/sowmya/genomes/${GENOME}.chrom.sizes -bga -split -scale ${scalingFactor} >  ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.sorted.deduped.bg
 bedGraphToBigWig ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.sorted.deduped.bg   /data/rivera/sowmya/genomes/${GENOME}.chrom.sizes ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.sorted.deduped.bw
 rm ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.sorted.deduped.bg
