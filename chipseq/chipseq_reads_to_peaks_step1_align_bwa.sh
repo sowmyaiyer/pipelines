@@ -124,7 +124,7 @@ do
 		echo """
 	cat ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz > ${OUTPUT_DIR}/combined_fastqs/${SAMPLE_NAME}_R1.fastq.gz
 	cat ${FASTQ_PREFIX}*_L00*_R2_001.fastq.gz > ${OUTPUT_DIR}/combined_fastqs/${SAMPLE_NAME}_R2.fastq.gz
-		""" >> ../bsubFiles/hisat2_alignment_${GENOME}_${SAMPLE_NAME}.bsub
+		""" >> ../bsubFiles/bwa_alignment_${GENOME}_${SAMPLE_NAME}.bsub
 		R1_FASTQ=${OUTPUT_DIR}/combined_fastqs/${SAMPLE_NAME}_R1.fastq.gz
 		R2_FASTQ=${OUTPUT_DIR}/combined_fastqs/${SAMPLE_NAME}_R2.fastq.gz
         fi
@@ -141,12 +141,12 @@ do
         samtools index ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.deduped.bam
         rm ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r1.sai ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r2.sai ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sam 
 
-        samtools flagstat ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.raw.bam >  ${OUTPUT_DIR}/hisat2out/${SAMPLE_NAME}.flagstat
+        samtools flagstat ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.raw.bam >  ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.flagstat
         totalRawReads=\`awk '{ if (NR == 1) print \$1 }'  ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.flagstat\`
         mappedReads=\`awk '{ if (NR == 5) print \$1 }'  ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.flagstat\`
         dedupedReads=\`samtools view -c  ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.deduped.bam\`
         fraction_dups=\`grep \"Unknown \" ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.dups.txt | awk '{ print \$(NF-1)}'\`
-        rm ${OUTPUT_DIR}/hisat2out/${SAMPLE_NAME}.raw.bam ${OUTPUT_DIR}/hisat2out/${SAMPLE_NAME}.sorted.bam
+        rm ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.raw.bam ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.bam
 
         echo ${SAMPLE_NAME} \${totalRawReads} \${mappedReads} \${dedupedReads} \${fraction_dups} > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.mapping_metrics.txt """ >> ../bsubFiles/bwa_alignment_${GENOME}_${SAMPLE_NAME}.bsub
 done < ${FILE_SAMPLE_LIST}

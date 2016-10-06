@@ -65,7 +65,8 @@ done
 if [[ ${GENOME} == "mm10" ]]; then
 	GENOME_FASTA=/data/rivera/genomes/mm10/mm10.fa
 	STAR_INDEX_DIR=/data/rivera/genomes/mm10/star_index
-	ANNOTATION_GTF=/data/rivera/genomes/mm10/gencode.vM6.basic.annotation.gtf
+	#ANNOTATION_GTF=/data/rivera/genomes/mm10/gencode.vM6.basic.annotation.gtf
+	ANNOTATION_GTF=/data/rivera/genomes/UCSC_refFLAT.mm10.09_30_2016/mm10.09_30_2016.refFlat.gtf
 	if [[ ! -f  /data/rivera/sowmya/genomes/mm10.chrom.sizes ]]; then
 		/data/aryee/pub/genomes/fetchChromSizes mm10  > /data/rivera/sowmya/genomes/mm10.chrom.sizes
 	fi

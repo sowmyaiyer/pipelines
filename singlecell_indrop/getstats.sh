@@ -11,6 +11,6 @@ do
 		total_reads=`zcat /data/langenau/singlecell_prkdc/demultiplexed/${sample}.processed/$bc.fastq.gz | wc -l`
 		total_umis=`awk -F"," 'BEGIN{sum=0}{sum=sum+$2}END{print sum}' /data/langenau/singlecell_prkdc/out_singlecell/out_kallisto/${sample}.${bc}.genename.umi_counts`
 		detected_transcripts=`awk -F"," 'BEGIN{sum=0}{if ($2 > 0) {sum=sum+1}}END{print sum}' /data/langenau/singlecell_prkdc/out_singlecell/out_kallisto/${sample}.${bc}.genename.umi_counts`
-		echo $bc $((total_reads/4)) `cut -f1 /data/langenau/singlecell_prkdc/out_singlecell/out_kallisto/${sample}.${bc}.OUT.sam | sort | uniq | wc -l` ${total_umis} ${detected_transcripts} >> /data/langenau/singlecell_prkdc/out_singlecell/stats.${sample}.3.txt
+		echo $bc $((total_reads/4)) `samtools view -F4 /data/langenau/singlecell_prkdc/out_singlecell/out_kallisto/${sample}.${bc}.OUT.sam | cut -f1 | sort | uniq | wc -l` ${total_umis} ${detected_transcripts} >> /data/langenau/singlecell_prkdc/out_singlecell/stats.${sample}.3.txt
 	done < /data/langenau/singlecell_prkdc/demultiplexed/${sample}.processed.barcodes_above_threshold.txt
 done

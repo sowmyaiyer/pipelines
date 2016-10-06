@@ -64,6 +64,13 @@ elif [[ ${GENOME} == "Zv9" ]]; then
 	if [[ ! -f  /data/rivera/sowmya/genomes/Zv9.chrom.sizes ]]; then
 		/data/aryee/pub/genomes/fetchChromSizes danRer7 | sed 's/^chr//g' > /data/rivera/sowmya/genomes/Zv9.chrom.sizes
 	fi
+elif [[ ${GENOME} == "GRCz10" ]]; then
+        GENOME_FASTA=/data/langenau/Danio_rerio.GRCz10.dna.toplevel.fa #/pub/genome_references/Zv9/Danio_rerio.Zv9.69.dna.toplevel.fa
+        STAR_INDEX_DIR=/data/langenau/STAR_index_GRCz10.85
+        ANNOTATION_GTF=/data/langenau/Danio_rerio.GRCz10.85.gtf
+        if [[ ! -f  /data/rivera/sowmya/genomes/GRCz10.chrom.sizes ]]; then
+                /data/aryee/pub/genomes/fetchChromSizes danRer10 | sed 's/^chr//g' > /data/rivera/sowmya/genomes/GRCz10.chrom.sizes
+        fi
 fi
 echo $GENOME_FASTA $STAR_INDEX_DIR $ANNOTATION_GTF
 
@@ -122,7 +129,7 @@ do
 	echo fastq_1 is ${R1_FASTQ}
 	echo fastq_2 is ${R2_FASTQ}
 
-	if [[ ${STRANDED} == "NO" ]] then
+	if [[ ${STRANDED} == "NO" ]]; then
 		added_star_option=" --outSAMstrandField intronMotif"
 	else
 		added_star_option=""	
