@@ -1,5 +1,5 @@
 if [[ $# -lt 2 ]]; then
-    echo "Usage: `basename $0` <full path to GTF> <output directory> <strandedness>(if stranded library, "forward" or "reverse"; if not provided, assumed unstranded)... ">&2
+    echo "Usage: `basename $0` <full path to GTF> <output directory(parent folder to STAR_out from previous step)> <strandedness>(if stranded library, "forward" or "reverse"; if not provided, assumed unstranded)... ">&2
     exit 1
 fi
 

@@ -3,6 +3,7 @@
 # Had to do this because they had moved a T-cell receptor gene from protein-coding to lincRNA status, so it was in a different fa file
 
 cat /data/langenau/Danio_rerio.GRCz10.cdna.all.fa /data/langenau/Danio_rerio.GRCz10.ncrna.fa > /data/langenau/Danio_rerio.GRCz10.cdna_and_ncrna.fa
+grep ">" /data/langenau/Danio_rerio.GRCz10.cdna_and_ncrna.fa | awk -F" " '{ split($5, biotype,":"); split($4,gene,":"); print gene[2]"\t"biotype[2]}' | sort  --unique > /data/langenau/Danio_rerio.GRCz10.gene_biotypes.txt
 kallisto index -i /data/langenau/Danio_rerio.GRCz10.cdna_and_ncrna.fa.kallisto_index /data/langenau/Danio_rerio.GRCz10.cdna_and_ncrna.fa
 
 grep ">ENS" /data/langenau/Danio_rerio.GRCz10.cdna_and_ncrna.fa | awk '{ 

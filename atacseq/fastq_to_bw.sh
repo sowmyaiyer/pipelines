@@ -4,13 +4,13 @@ if [[ $# -lt 4 ]]; then
 	-s=sampleName 
 	-q=FastqPrefix 
 	-o=outputDir 
-	-n=scale for bw(optional; multiple of 1 million; defaults to 1) 
+	--combine_fastq(optional)
 	--run_fastqc(optional) ... ">&2
     exit 1
 fi
 
 FASTQC="NO"
-SCALING_FACTOR_MULT=1
+COMBINE_FASTQ="NO"
 
 for i in "$@"
 do
@@ -31,12 +31,12 @@ case $i in
     OUTPUT_DIR="${i#*=}"  
     shift 
     ;;
-    -n=*|--scaling_factor=*)
-    SCALING_FACTOR_MULT="${i#*=}"  
-    shift 
-    ;;
     --run_fastqc)
     FASTQC="YES"
+    shift # past argument with no value
+    ;;
+    --combine_fastq)
+    COMBINE_FASTQ="YES"
     shift # past argument with no value
     ;;
    -h)
@@ -45,7 +45,6 @@ case $i in
         -s=sampleName
         -q=FastqPrefix
         -o=outputDir
-        -n=scale for bw(optional; multiple of 1 million; defaults to 1)
         --run_fastqc(optional) ... ">&2
     exit 1
     shift 
@@ -69,14 +68,11 @@ elif [[ ${GENOME} == "hg19" ]]; then
 fi
 echo $GENOME_FASTA 
 
-mkdir -p ${OUTPUT_DIR}/combined_fastq
 mkdir -p ${OUTPUT_DIR}/bwa_out
 mkdir -p ${OUTPUT_DIR}/bigwigs
 
-LOG_FILE_BWA=${OUTPUT_DIR}/bwa_out/${SAMPLE}.bwa.log
+MIN_QUAL=5
 
-R1_FASTQ=`ls ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz`
-R2_FASTQ=`ls ${FASTQ_PREFIX}*_L00*_R2_001.fastq.gz`
 
 echo sample name is ${SAMPLE_NAME}
 
@@ -107,21 +103,32 @@ module load python/2.7.3
 module load RSeQC/2.4
 module load ucsc
 
+if [[ $COMBINE_FASTQ == "YES" ]]; then
+	mkdir -p ${OUTPUT_DIR}/combined_fastq
+	cat ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz >  ${OUTPUT_DIR}/combined_fastq/${SAMPLE_NAME}.R1.fastq.gz
+	cat ${FASTQ_PREFIX}*_L00*_R2_001.fastq.gz >  ${OUTPUT_DIR}/combined_fastq/${SAMPLE_NAME}.R2.fastq.gz
 
-cat ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz >  ${OUTPUT_DIR}/combined_fastq/${SAMPLE_NAME}.R1.fastq.gz
-cat ${FASTQ_PREFIX}*_L00*_R2_001.fastq.gz >  ${OUTPUT_DIR}/combined_fastq/${SAMPLE_NAME}.R2.fastq.gz
+	R1_FASTQ=${OUTPUT_DIR}/combined_fastq/${SAMPLE_NAME}.R1.fastq.gz
+	R2_FASTQ=${OUTPUT_DIR}/combined_fastq/${SAMPLE_NAME}.R2.fastq.gz
+else
+	R1_FASTQ=${FASTQ_PREFIX}.R1.fastq.gz
+	R2_FASTQ=${FASTQ_PREFIX}.R2.fastq.gz
+fi
 
-bwa aln -t 4 ${BWA_INDEX} ${R1_FASTQ} 2>${LOG_FILE_BWA} > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r1.sai
-bwa aln -t 4 ${BWA_INDEX} ${R2_FASTQ} 2>${LOG_FILE_BWA} > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r2.sai
+ls ${R1_FASTQ} ${R2_FASTQ}
+bwa aln -t 4 ${BWA_INDEX} ${R1_FASTQ} > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r1.sai
+bwa aln -t 4 ${BWA_INDEX} ${R2_FASTQ} > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r2.sai
 bwa sampe ${BWA_INDEX} ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r1.sai ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r2.sai ${R1_FASTQ} ${R2_FASTQ} > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sam
 samtools view -bS ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sam > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.raw.bam
-samtools view -b -F2304 -q ${MIN_QUAL} ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.raw.bam > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.bam
-samtools sort -T ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted -o ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.bam  ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.bam
 echo "Done bwa alignment"
+samtools view -b -f2 -F2304 -q ${MIN_QUAL} ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.raw.bam > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.bam
+echo "start sorting"
+samtools sort -T ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted -o ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.bam  ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.bam
+echo "done sorting"
 
-echo "Start deduping"
-samtools view -b ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.bam > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.clean.bam
-java  -Xmx40g -jar /apps/source/picard-tools-1.95/MarkDuplicates.jar I=${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.clean.bam O=${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.nodups.bam M=${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.dups.txt REMOVE_DUPLICATES=true ASSUME_SORTED=true VALIDATION_STRINGENCY=LENIENT VERBOSITY=ERROR
+
+echo "Start deduping; index deduped bam"
+java  -jar /apps/source/picard-tools-1.95/MarkDuplicates.jar I=${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.bam O=${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.nodups.bam M=${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.dups.txt REMOVE_DUPLICATES=true ASSUME_SORTED=true VALIDATION_STRINGENCY=LENIENT VERBOSITY=ERROR
 samtools index ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.nodups.bam
 echo "done deduping"
 
@@ -131,10 +138,10 @@ totalRawReads=`awk '{ if (NR == 1) print \$1 }'  ${OUTPUT_DIR}/bwa_out/${SAMPLE_
 mappedReads=`awk '{ if (NR == 5) print \$1 }'  ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.flagstat`
 dedupedReads=`samtools view -c  ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.nodups.bam`
 fraction_dups=`grep "Unknown " ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.dups.txt | awk '{ print $(NF-1)}'`
-echo "done mapping metrics"
 
 echo ${SAMPLE_NAME} ${totalRawReads} ${mappedReads} ${dedupedReads} ${fraction_dups} > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.mapping_metrics.txt
-rm ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r1.sai ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r2.sai ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sam ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.bam ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.clean.bam
+echo "done mapping metrics"
+#rm ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r1.sai ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.r2.sai ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sam ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.raw.bam ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.sorted.bam
 
 echo "start shift reads by +4 and -5 for positive and negative strand reads"
 bedtools bamtobed -i ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.nodups.bam | awk 'BEGIN{OFS="\t"} { 
@@ -143,17 +150,19 @@ bedtools bamtobed -i ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.nodups.bam | awk 'BEGI
 									else if ($6 == "-")
 										pos = $3 - 5
 									print $1,pos,pos+1
-									}' ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.shifted.bed
+									}' > ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.shifted.bed
 echo "done shift reads"
 
 	
 # Generate depth-normalized bigwig file
 echo "start bw file generation"
-scalingFactor=`echo ${dedupedReads} | awk -vmappedReads=${dedupedReads} -vSCALING_FACTOR=${SCALING_FACTOR_MULT} 'BEGIN{print 1000000*SCALING_FACTOR/mappedReads}'`
-echo $scalingFactor
-sort -k1,1 ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.shifted.bed | bedtools genomecov -i stdin -g  /data/rivera/sowmya/genomes/${GENOME}.chrom.sizes -bga -scale ${scalingFactor} >  ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.bg
+normFactor=`echo "10000000/${dedupedReads}" | bc -l`
+echo $normFactor
+bedtools coverage -a ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.shifted.bed -b /data/rivera/genomes/hg19.windows.150.20.chr.bed -counts > ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.raw.bg
+awk -vnormFactor=${normFactor} 'BEGIN{OFS="\t"}{if ($4 > 0 && $3-$2 > 140) print $1,$2+65,$3-65,normFactor*$4}' ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.raw.bg > ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.unsorted.bg
+sort -k1,1 -k2,2n ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.unsorted.bg > ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.bg
 bedGraphToBigWig ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.bg  /data/rivera/sowmya/genomes/${GENOME}.chrom.sizes ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.bw
-rm ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.bg
+#rm ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.raw.bg ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.unsorted.bg ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.bg
 echo "DONE bw file generation"
 
 # DONE
