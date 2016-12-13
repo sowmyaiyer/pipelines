@@ -70,6 +70,13 @@ if [[ ${GENOME} == "mm10" ]]; then
 	if [[ ! -f  /data/rivera/sowmya/genomes/mm10.chrom.sizes ]]; then
 		/data/aryee/pub/genomes/fetchChromSizes mm10  > /data/rivera/sowmya/genomes/mm10.chrom.sizes
 	fi
+elif [[ ${GENOME} == "mm9" ]]; then
+        GENOME_FASTA=/data/pinello/COMMON_DATA/REFERENCE_GENOMES/Mus_musculus/UCSC/mm9/Sequence/WholeGenomeFasta/genome.fa
+        STAR_INDEX_DIR=/data/rivera/sowmya/genomes/STAR_indices/STAR_index_mm9
+        ANNOTATION_GTF=/data/rivera/genomes/UCSC_refFLAT.mm9.12_05_2016/mm9.12_05_2016.refFlat.gtf
+        if [[ ! -f  /data/rivera/sowmya/genomes/mm9.chrom.sizes ]]; then
+                /data/aryee/pub/genomes/fetchChromSizes mm9  > /data/rivera/sowmya/genomes/mm9.chrom.sizes
+        fi
 elif [[ ${GENOME} == "hg19" ]]; then
 	GENOME_FASTA=/pub/genome_references/UCSC/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.fa
 	STAR_INDEX_DIR=/data/rivera/sowmya/genomes/STAR_indices/STAR_index_hg19
@@ -87,7 +94,48 @@ elif [[ ${GENOME} == "GRCz10" ]]; then
 fi
 echo $GENOME_FASTA $STAR_INDEX_DIR $ANNOTATION_GTF
 
+if [[ ${STRANDEDNESS} == "reverse" ]]; then
+        CUFFLINKS_STRANDEDNESS="fr-firststrand"
+elif [[ ${STRANDEDNESS} == "forward" ]]; then
+        CUFFLINKS_STRANDEDNESS="fr-secondstrand"
+else
+        CUFFLINKS_STRANDEDNESS="fr-unstranded"
+fi
 
+mkdir -p ${OUTPUT_DIR}/STAR_out
+mkdir -p ${OUTPUT_DIR}/cufflinks_out
+mkdir -p ${OUTPUT_DIR}/bigwigs
+
+
+R1_FASTQ=`ls ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz`
+R2_FASTQ=`ls ${FASTQ_PREFIX}*_L00*_R2_001.fastq.gz`
+
+echo sample name is ${SAMPLE_NAME}
+echo fastq_1 is ${R1_FASTQ}
+echo fastq_2 is ${R2_FASTQ}
+
+if [[ $FASTQC == "YES" ]]; then
+	echo "start fastqc"
+	mkdir -p ${OUTPUT_DIR}/fastqc_out
+	module load fastqc/0.11.2
+	mkdir -p ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R1
+	mkdir -p ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R2
+	zcat ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz | fastqc --noextract -o ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R1 stdin
+	zcat ${FASTQ_PREFIX}*_L00*_R2_001.fastq.gz | fastqc --noextract -o ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R2 stdin
+	mv ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R1/stdin_fastqc.zip ${OUTPUT_DIR}/fastqc_out/${SAMPLE_NAME}_R1_fastqc.zip
+	mv ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R2/stdin_fastqc.zip ${OUTPUT_DIR}/fastqc_out/${SAMPLE_NAME}_R2_fastqc.zip
+	mv ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R1/stdin_fastqc.html ${OUTPUT_DIR}/fastqc_out/${SAMPLE_NAME}_R1_fastqc.html
+	mv ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R2/stdin_fastqc.html ${OUTPUT_DIR}/fastqc_out/${SAMPLE_NAME}_R2_fastqc.html
+	rm -rf ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R[1,2]
+	echo "end fastqc"
+fi
+
+echo "Start STAR alignment"
+readLength=`zcat ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz | head -2 | tail -1 | awk '{ print length($0)}'` # only checks read length of first read. Maybe a problem if reads have been trimmed or have variable lengths for other reasons
+echo read length is $readLength
+sjdbOverhang=$((readLength -1))
+star_fastq_R1=`echo $R1_FASTQ | sed 's/ /,/g'`
+star_fastq_R2=`echo $R2_FASTQ | sed 's/ /,/g'`
 
 module use /apps/modulefiles/lab
 module load aryee/star-2.4.0h
@@ -99,7 +147,49 @@ module load RSeQC/2.4
 module load ucsc
 module load cufflinks/2.2.1
 
-reads_after_rRNA_removal=`samtools view -c  ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed.bam`
+star_fastq_R1=`echo $R1_FASTQ | sed 's/ /,/g'`
+star_fastq_R2=`echo $R2_FASTQ | sed 's/ /,/g'`	
+
+if [[ $CUFFLINKS_STRANDEDNESS == "fr-unstranded" ]]; then
+	added_star_option=" --outSAMstrandField intronMotif"
+else
+	added_star_option=""
+fi
+
+
+echo "Done STAR alignment"
+	
+# Sorting in separate step because STAR sometimes crashes while sorting by coordinate
+echo "Start Sorting BAM file"
+
+
+echo "End Sorting BAM file"
+
+# Remove duplicates
+echo "Start deduping"
+
+
+echo "DONE deduping"
+
+
+# Remove rRNA reads
+echo "start removing rRNA reads"
+split_bam.py -i ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.bam -r /PHShome/si992/commonscripts/rnaseq/${GENOME}_rRNA.bed --out-prefix=${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed > ${OUTPUT_DIR}/STAR_out/rRNA_${SAMPLE_NAME}.txt
+mv ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed.ex.bam ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed.bam
+samtools index ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed.bam
+rm ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed.in.bam ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed.junk.bam
+echo "DONE removing rRNA reads"
+
+# Get some numbers on mapping
+echo "start getting mapping metrics"
+totalRawReads=`grep "Number of input reads" ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Log.final.out | cut -f2`
+uniquelyMappedReads=`grep "Uniquely mapped reads %" ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Log.final.out | cut -f2`
+multiMappingReads=`grep "% of reads mapped to multiple loci" ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Log.final.out | cut -f2`
+dedupedReads=`samtools view -c  ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.bam`
+fraction_dups=`grep "Unknown " ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}.dups.txt | awk '{ print $(NF-1)}'`
+reads_after_rRNA_removal=`samtools view -c  ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed.bam `
+echo ${SAMPLE_NAME} ${totalRawReads} ${uniquelyMappedReads} ${multiMappingReads} ${dedupedReads} ${fraction_dups} ${reads_after_rRNA_removal} > ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}.mapping_metrics.txt
+echo "DONE mapping metrics"
 
 # Generate depth-normalized bigwig file
 echo "start bw file generation"
@@ -109,3 +199,10 @@ bedtools genomecov -ibam ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCo
 bedGraphToBigWig ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.sorted.deduped.bg   /data/rivera/sowmya/genomes/${GENOME}.chrom.sizes ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.sorted.deduped.bw
 rm ${OUTPUT_DIR}/bigwigs/${SAMPLE_NAME}.sorted.deduped.bg
 echo "DONE bw file generation"
+
+# Get FPKMs for isoforms
+echo "start cufflinks"
+cufflinks --quiet --library-type ${CUFFLINKS_STRANDEDNESS} -o ${OUTPUT_DIR}/cufflinks_out/${SAMPLE_NAME} -G ${ANNOTATION_GTF} ${OUTPUT_DIR}/STAR_out/${SAMPLE_NAME}Aligned.sortedByCoord.out.deduped.rRNA_removed.bam
+echo "DONE cufflinks"
+# DONE
+echo "ALL DONE!" See ${OUTPUT_DIR} for output and logs

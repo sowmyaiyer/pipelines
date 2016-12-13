@@ -30,8 +30,10 @@ cat *sampleFile > Zebrafish-all.sampleFile
 ./prep_kallisto.sh 
 
 # For kallisto + umi counting
-./step2_kallisto.sh
-./step3_merge_umicounts.sh
+#./step2_kallisto.sh
+#./step3_merge_umicounts.sh
+./step2_rapmap.sh
+./step3_merge_umicounts_rapmap.sh
 
 
 

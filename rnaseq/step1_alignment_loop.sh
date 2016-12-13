@@ -70,6 +70,13 @@ if [[ ${GENOME} == "mm10" ]]; then
 	if [[ ! -f  /data/rivera/sowmya/genomes/mm10.chrom.sizes ]]; then
 		/data/aryee/pub/genomes/fetchChromSizes mm10  > /data/rivera/sowmya/genomes/mm10.chrom.sizes
 	fi
+elif [[ ${GENOME} == "mm9" ]]; then
+        GENOME_FASTA=/data/pinello/COMMON_DATA/REFERENCE_GENOMES/Mus_musculus/UCSC/mm9/Sequence/WholeGenomeFasta/genome.fa
+        STAR_INDEX_DIR=/data/rivera/sowmya/genomes/STAR_indices/STAR_index_mm9
+        ANNOTATION_GTF=/data/rivera/genomes/UCSC_refFLAT.mm9.12_05_2016/mm9.12_05_2016.refFlat.gtf
+        if [[ ! -f  /data/rivera/sowmya/genomes/mm9.chrom.sizes ]]; then
+                /data/aryee/pub/genomes/fetchChromSizes mm9  > /data/rivera/sowmya/genomes/mm9.chrom.sizes
+        fi
 elif [[ ${GENOME} == "hg19" ]]; then
 	GENOME_FASTA=/pub/genome_references/UCSC/Homo_sapiens/UCSC/hg19/Sequence/WholeGenomeFasta/genome.fa
 	STAR_INDEX_DIR=/data/rivera/sowmya/genomes/STAR_indices/STAR_index_hg19
