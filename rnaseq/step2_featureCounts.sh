@@ -1,13 +1,14 @@
 if [[ $# -lt 2 ]]; then
 	echo "Usage: `basename $0` 
 	-g=<genome>
-	-b=<txt file with list of bams> NOT IMPLEMENTED
+	-b=<txt file with list of bams>
 	-p=<path to bam files for wildcard search>
 	-o=<featureCounts output folder>
 	-r=<strandedness>(if stranded library, "forward" or "reverse"; if not provided, assumed unstranded)... ">&2    
 	exit 1
 fi
 
+LIST_PROVIDED="NO"
 
 for i in "$@"
 do
@@ -18,6 +19,7 @@ case $i in
     ;;
     -b=*|--bamFileList=*)
     BAMFILE_LIST="${i#*=}"
+    LIST_PROVIDED="YES"
     shift
     ;;
     -p=*|--bamFilePath=*)
@@ -35,10 +37,10 @@ case $i in
     -h)
         "Usage: `basename $0`
         -g=<genome>
-        -b=<txt file with list of bams> NOT IMPLEMENTED
+        -b=<txt file with list of bams>
         -p=<path to bam files for wildcard search>
         -o=<featureCounts output folder>
-        -r=<strandedness>(if stranded library, "forward" or "reverse"; if not provided, assumed unstranded)... ">&2
+        -r=<strandedness>(if stranded library, \"forward\" or \"reverse\"; if not provided, assumed unstranded)... ">&2
 	exit 1
     shift
     ;;
@@ -54,6 +56,8 @@ elif [[ ${GENOME} == "mm9" ]]; then
         ANNOTATION_GTF=/data/rivera/genomes/UCSC_refFLAT.mm9.12_05_2016/mm9.12_05_2016.refFlat.gtf
 elif [[ ${GENOME} == "hg19" ]]; then
         ANNOTATION_GTF=/data/rivera/genomes/UCSC_refFLAT.07_08_2016/ucsc_refFlat.07_08_2016.gtf
+elif [[ ${GENOME} == "Zv9" ]]; then
+        ANNOTATION_GTF=/data/langenau/Danio_rerio.Zv9.79.gtf
 elif [[ ${GENOME} == "GRCz10" ]]; then
         ANNOTATION_GTF=/data/langenau/Danio_rerio.GRCz10.85.gtf
 fi
@@ -68,8 +72,17 @@ else
 fi
 
 mkdir -p ${OUTPUT_DIR}
+echo ${LIST_PROVIDED}
+echo ${ANNOTATION_GTF}
+if [[ ${LIST_PROVIDED} == "YES" ]]; then
+	BAM_FILES=`awk '{ printf("%s ",$0) }' ${BAMFILE_LIST}`
+	featureCounts -s ${FEATURE_COUNTS_STRANDEDNESS} -p --primary -Q 10 -T 4 -C -F GTF -a ${ANNOTATION_GTF} -o ${OUTPUT_DIR}/combined.counts ${BAM_FILES}
+else
+	featureCounts -s ${FEATURE_COUNTS_STRANDEDNESS} -p --primary -Q 10 -T 4 -C -F GTF -a ${ANNOTATION_GTF} -o ${OUTPUT_DIR}/combined.counts ${BAMFILE_PATH}/*Aligned.sortedByCoord.out.deduped.rRNA_removed.bam
+fi
 
-featureCounts -s ${FEATURE_COUNTS_STRANDEDNESS} -p --primary -Q 10 -T 4 -C -F GTF -a ${ANNOTATION_GTF} -o ${OUTPUT_DIR}/combined.counts ${BAMFILE_PATH}/*Aligned.sortedByCoord.out.deduped.rRNA_removed.bam
+
+
 sed 1d  ${OUTPUT_DIR}/combined.counts | sed 's/\"//g' | sed "s|${BAMFILE_PATH}\/*||g"| sed 's/Aligned\.sortedByCoord\.out\.deduped\.rRNA_removed\.bam//g' > ${OUTPUT_DIR}/combined.counts.formatted.txt
 sed 's/\"//g' ${OUTPUT_DIR}/combined.counts.summary | sed "s|${BAMFILE_PATH}\/*||g"| sed 's/Aligned\.sortedByCoord\.out\.deduped\.rRNA_removed\.bam//g' >  ${OUTPUT_DIR}/combined.counts.summary.formatted.txt
 

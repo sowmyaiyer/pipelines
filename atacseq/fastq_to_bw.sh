@@ -132,6 +132,12 @@ java  -jar /apps/source/picard-tools-1.95/MarkDuplicates.jar I=${OUTPUT_DIR}/bwa
 samtools index ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.nodups.bam
 echo "done deduping"
 
+
+echo "Start plotting insert size histogram"
+java -jar /apps/source/picardtools/picard-tools-1.58/CollectInsertSizeMetrics.jar I=${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.nodups.bam  O=${OUTPUT_DIR}/bwa_out/InsertSizes.${SAMPLE_NAME}.txt H=${OUTPUT_DIR}/bwa_out/insert_size_histogram.${SAMPLE_NAME}.pdf
+echo "Done plotting insert size histogram"
+
+
 echo "start mapping metrics"
 samtools flagstat ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.raw.bam >  ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.flagstat
 totalRawReads=`awk '{ if (NR == 1) print \$1 }'  ${OUTPUT_DIR}/bwa_out/${SAMPLE_NAME}.flagstat`

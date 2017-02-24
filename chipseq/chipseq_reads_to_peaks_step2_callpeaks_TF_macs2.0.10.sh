@@ -1,5 +1,12 @@
 if [[ $# -lt 4 ]]; then
-    echo "Usage: `basename $0` -s=sampleName -t=<treatment bam file> -c=<control bam file> -q=<q-value threshold, 0.01 default> -o=<outputDir> -d=(merge peaks within d; optional) --broad(optional) ... ">&2
+    echo "Usage: `basename $0` 
+	-s=sampleName 
+	-t=<treatment bam file> 
+	-c=<control bam file> 
+	-q=<q-value threshold, 0.01 default if not provided> 
+	-o=<outputDir> 
+	-d=(merge peaks within d; optional) 
+	--broad(optional) ... ">&2
     exit 1
 fi
 
@@ -40,7 +47,14 @@ case $i in
     shift # past argument with no value
     ;;
    -h)
-    echo "Usage: `basename $0` -s=sampleName -t=<treatment bam file> -c=<control bam file> -q=<q-value threshold, 0.01 default> -o=<outputDir> -d=(merge peaks within d; optional) --broad(optional) ... ">&2
+    echo "Usage: `basename $0`
+        -s=sampleName
+        -t=<treatment bam file>
+        -c=<control bam file>
+        -q=<q-value threshold, 0.01 default if not provided>
+        -o=<outputDir>
+        -d=(merge peaks within d; optional)
+        --broad(optional) ... ">&2
     exit 1
     shift
     ;;
@@ -55,6 +69,7 @@ module load python/2.7.3
 module load  numpy-1.7
 module load macs2/2.0.10
 
+mkdir -p ${OUTPUT_DIR}
 cd ${OUTPUT_DIR}
 
 if [[ ${BROAD_PEAKS} == "YES" ]]; then
@@ -72,11 +87,10 @@ PEAK_FILE_PROPER=${PEAK_FILE}.clean.bed
 BLACKLIST=/data/rivera/genomes/wgEncodeDacMapabilityConsensusExcludable.bed
 
 # Get valid chromosomes and subtract blacklisted regions
-awk 'NR==FNR{a[$0];next}($1 in a)' $HOME/commonscripts/chipseq/human_chrs.nochr.txt ${PEAK_FILE} | bedtools subtract -a stdin -b ${BLACKLIST} -A > ${PEAK_FILE_PROPER}
+awk 'NR==FNR{a[$0];next}($1 in a)' /PHShome/si992/commonscripts/chipseq/human_chrs.nochr.txt ${PEAK_FILE} | bedtools subtract -a stdin -b ${BLACKLIST} -A > ${PEAK_FILE_PROPER}
 echo "DONE cleaning up peaks"
 
 if [[ ${MERGE_PEAKS} == "YES" ]]; then
 	sort -k1,1 -k2,2n ${PEAK_FILE_PROPER} | bedtools merge -i stdin -d ${MERGE_DISTANCE} -nms > ${PEAK_FILE}.clean.merged.${MERGE_DISTANCE}.bed
 	echo "DONE merging peaks"
 fi
-
