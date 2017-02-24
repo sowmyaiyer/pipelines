@@ -64,7 +64,7 @@ done
 
 if [[ ${GENOME} == "mm10" ]]; then
 	GENOME_FASTA=/data/rivera/genomes/mm10/mm10.fa
-	STAR_INDEX_DIR=/data/rivera/genomes/mm10/star_index
+	STAR_INDEX_DIR=/data/rivera/sowmya/genomes/STAR_indices/STAR_index_mm10
 	#ANNOTATION_GTF=/data/rivera/genomes/mm10/gencode.vM6.basic.annotation.gtf
 	ANNOTATION_GTF=/data/rivera/genomes/UCSC_refFLAT.mm10.09_30_2016/mm10.09_30_2016.refFlat.gtf
 	if [[ ! -f  /data/rivera/sowmya/genomes/mm10.chrom.sizes ]]; then
@@ -84,6 +84,13 @@ elif [[ ${GENOME} == "hg19" ]]; then
 	if [[ ! -f  /data/rivera/sowmya/genomes/hg19.chrom.sizes ]]; then
 		/data/aryee/pub/genomes/fetchChromSizes hg19 > /data/rivera/sowmya/genomes/hg19.chrom.sizes
 	fi
+elif [[ ${GENOME} == "Zv9" ]]; then
+        GENOME_FASTA=/data/langenau/Danio_rerio.Zv9.dna_sm.toplevel.fa 
+        STAR_INDEX_DIR=/data/langenau/STAR_index_Zv9.79
+        ANNOTATION_GTF=/data/langenau/Danio_rerio.Zv9.79.gtf
+        if [[ ! -f  /data/rivera/sowmya/genomes/Zv9.chrom.sizes ]]; then
+                /data/aryee/pub/genomes/fetchChromSizes danRer7 | sed 's/^chr//g' > /data/rivera/sowmya/genomes/Zv9.chrom.sizes
+        fi
 elif [[ ${GENOME} == "GRCz10" ]]; then
         GENOME_FASTA=/data/langenau/Danio_rerio.GRCz10.dna.toplevel.fa #/pub/genome_references/Zv9/Danio_rerio.Zv9.69.dna.toplevel.fa
         STAR_INDEX_DIR=/data/langenau/STAR_index_GRCz10.85
@@ -107,8 +114,13 @@ mkdir -p ${OUTPUT_DIR}/cufflinks_out
 mkdir -p ${OUTPUT_DIR}/bigwigs
 
 
-R1_FASTQ=`ls ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz`
-R2_FASTQ=`ls ${FASTQ_PREFIX}*_L00*_R2_001.fastq.gz`
+#R1_FASTQ=`ls ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz`
+#R2_FASTQ=`ls ${FASTQ_PREFIX}*_L00*_R2_001.fastq.gz`
+
+# To accomodate fastqs that have already been combined. Keep the L00 and _R001 stuff optional. 
+# Fastq files in the least should have the prefix and a .R1.fastq.gz or .R2.fastq.gz
+R1_FASTQ=`ls ${FASTQ_PREFIX}* |  grep -P ".*(_L00[0-9]){0,1}_R1(_001){0,1}\.fastq\.gz"`
+R2_FASTQ=`ls ${FASTQ_PREFIX}* |  grep -P ".*(_L00[0-9]){0,1}_R2(_001){0,1}\.fastq\.gz"`
 
 echo sample name is ${SAMPLE_NAME}
 echo fastq_1 is ${R1_FASTQ}
@@ -120,8 +132,8 @@ if [[ $FASTQC == "YES" ]]; then
 	module load fastqc/0.11.2
 	mkdir -p ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R1
 	mkdir -p ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R2
-	zcat ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz | fastqc --noextract -o ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R1 stdin
-	zcat ${FASTQ_PREFIX}*_L00*_R2_001.fastq.gz | fastqc --noextract -o ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R2 stdin
+	zcat ${R1_FASTQ} | fastqc --noextract -o ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R1 stdin
+	zcat ${R2_FASTQ} | fastqc --noextract -o ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R2 stdin
 	mv ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R1/stdin_fastqc.zip ${OUTPUT_DIR}/fastqc_out/${SAMPLE_NAME}_R1_fastqc.zip
 	mv ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R2/stdin_fastqc.zip ${OUTPUT_DIR}/fastqc_out/${SAMPLE_NAME}_R2_fastqc.zip
 	mv ${OUTPUT_DIR}/fastqc_out_${SAMPLE_NAME}_R1/stdin_fastqc.html ${OUTPUT_DIR}/fastqc_out/${SAMPLE_NAME}_R1_fastqc.html
@@ -131,7 +143,7 @@ if [[ $FASTQC == "YES" ]]; then
 fi
 
 echo "Start STAR alignment"
-readLength=`zcat ${FASTQ_PREFIX}*_L00*_R1_001.fastq.gz | head -2 | tail -1 | awk '{ print length($0)}'` # only checks read length of first read. Maybe a problem if reads have been trimmed or have variable lengths for other reasons
+readLength=`zcat ${R1_FASTQ}| head -2 | tail -1 | awk '{ print length($0)}'` # only checks read length of first read. Maybe a problem if reads have been trimmed or have variable lengths for other reasons
 echo read length is $readLength
 sjdbOverhang=$((readLength -1))
 star_fastq_R1=`echo $R1_FASTQ | sed 's/ /,/g'`
